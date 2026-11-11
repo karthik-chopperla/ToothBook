@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This changelog begins with the localization + infrastructure roadmap. Changes
 before it are not itemized here; see the git history and the
-[implementation plan](https://github.com/abinauv/dental-erp).
+[project repository](https://github.com/karthik-chopperla/ToothBook).
 
 ## [Unreleased]
 

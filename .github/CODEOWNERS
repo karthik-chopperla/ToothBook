@@ -2,12 +2,4 @@
 # See https://docs.github.com/articles/about-code-owners
 
 # Default owner for everything in the repo.
-*       @abinauv
-
-# Auth, security, and deployment surfaces warrant extra care.
-/lib/auth.ts            @abinauv
-/lib/auth-client.ts     @abinauv
-/middleware.ts          @abinauv
-/prisma/                @abinauv
-/.github/               @abinauv
-/SECURITY.md            @abinauv
+*       @karthik-chopperla
