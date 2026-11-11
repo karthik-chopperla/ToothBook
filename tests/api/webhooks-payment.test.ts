@@ -1,0 +1,294 @@
+// @ts-nocheck
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+vi.mock('@/lib/prisma', () => import('../__mocks__/prisma'))
+
+const { mockGetGateway } = vi.hoisted(() => ({
+  mockGetGateway: vi.fn(),
+}))
+vi.mock('@/lib/payment-gateways', () => ({
+  getGateway: mockGetGateway,
+}))
+
+// ── Imports ──────────────────────────────────────────────────────────────────
+
+import { POST as webhookPOST } from '@/app/api/webhooks/payment/[provider]/route'
+import { prisma } from '@/lib/prisma'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeReq(provider: string, body: any, headers: Record<string, string> = {}): NextRequest {
+  return new NextRequest(`http://localhost/api/webhooks/payment/${provider}`, {
+    method: 'POST',
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+  })
+}
+
+function makeParams(provider: string) {
+  return { params: Promise.resolve({ provider }) }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POST /api/webhooks/payment/[provider]
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('POST /api/webhooks/payment/[provider]', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns 400 for unknown provider', async () => {
+    const res = await webhookPOST(makeReq('stripe', { some: 'data' }), makeParams('stripe') as any)
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.error).toContain('Unknown provider')
+  })
+
+  it('returns 400 for invalid JSON body', async () => {
+    const req = new NextRequest('http://localhost/api/webhooks/payment/razorpay', {
+      method: 'POST',
+      body: 'not-json{{{',
+      headers: { 'Content-Type': 'text/plain' },
+    })
+    const res = await webhookPOST(req, makeParams('razorpay') as any)
+    expect(res.status).toBe(400)
+  })
+
+  it('handles razorpay webhook — extracts order_id', async () => {
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay1',
+      hospitalId: 'h1',
+      status: 'COMPLETED',
+      gatewayOrderId: 'order_123',
+    } as any)
+
+    const res = await webhookPOST(
+      makeReq(
+        'razorpay',
+        {
+          payload: {
+            payment: {
+              entity: { order_id: 'order_123', status: 'captured' },
+            },
+          },
+        },
+        { 'x-razorpay-signature': 'sig123' }
+      ),
+      makeParams('razorpay') as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('already_processed')
+  })
+
+  it('settles the pending payment AND the invoice on a verified webhook', async () => {
+    // The reserved pending payment — carries the hospital, invoice and amount.
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay1',
+      hospitalId: 'h1',
+      status: 'PENDING',
+      invoiceId: 'inv1',
+      amount: 5000,
+      gatewayOrderId: 'order_456',
+    } as any)
+
+    const mockGateway = {
+      verifyWebhook: vi.fn().mockReturnValue(true),
+    }
+    mockGetGateway.mockResolvedValue({
+      gateway: mockGateway,
+      credentials: { webhookSecret: 'whsec_123' },
+    })
+    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({
+      id: 'inv1',
+      paidAmount: 0,
+      totalAmount: 5000,
+      balanceAmount: 5000,
+    } as any)
+    vi.mocked(prisma.payment.update).mockResolvedValue({
+      id: 'pay1',
+      paymentNo: 'PAY00001',
+      amount: 5000,
+    } as any)
+    vi.mocked(prisma.invoice.update).mockResolvedValue({} as any)
+
+    const res = await webhookPOST(
+      makeReq(
+        'razorpay',
+        {
+          event: 'payment.captured',
+          payload: {
+            payment: {
+              entity: { order_id: 'order_456', status: 'captured' },
+            },
+          },
+        },
+        { 'x-razorpay-signature': 'sig456' }
+      ),
+      makeParams('razorpay') as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('ok')
+    expect(mockGateway.verifyWebhook).toHaveBeenCalled()
+    // Payment marked COMPLETED...
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'pay1' },
+        data: expect.objectContaining({ status: 'COMPLETED' }),
+      })
+    )
+    // ...and, crucially, the invoice is settled (the old code skipped this).
+    expect(prisma.invoice.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'inv1' },
+        data: expect.objectContaining({ status: 'PAID' }),
+      })
+    )
+  })
+
+  it('rejects a webhook whose signature does not verify', async () => {
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay9',
+      hospitalId: 'h1',
+      status: 'PENDING',
+      invoiceId: 'inv9',
+      amount: 1000,
+      gatewayOrderId: 'order_bad',
+    } as any)
+    mockGetGateway.mockResolvedValue({
+      gateway: { verifyWebhook: vi.fn().mockReturnValue(false) },
+      credentials: { webhookSecret: 'whsec_123' },
+    })
+
+    const res = await webhookPOST(
+      makeReq(
+        'razorpay',
+        { payload: { payment: { entity: { order_id: 'order_bad' } } } },
+        { 'x-razorpay-signature': 'forged' }
+      ),
+      makeParams('razorpay') as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('invalid_signature')
+    expect(prisma.invoice.update).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      'razorpay',
+      {
+        event: 'payment.failed',
+        payload: { payment: { entity: { order_id: 'order_fail', status: 'failed' } } },
+      },
+    ],
+    [
+      'phonepe',
+      {
+        response: Buffer.from(
+          JSON.stringify({
+            success: false,
+            code: 'PAYMENT_ERROR',
+            data: { merchantTransactionId: 'order_fail' },
+          })
+        ).toString('base64'),
+      },
+    ],
+    ['paytm', { body: { ORDERID: 'order_fail', STATUS: 'TXN_FAILURE' } }],
+  ])('does not settle the invoice on a signed %s failure webhook', async (provider, payload) => {
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay7',
+      hospitalId: 'h1',
+      status: 'PENDING',
+      invoiceId: 'inv7',
+      amount: 2500,
+      gatewayOrderId: 'order_fail',
+    } as any)
+    mockGetGateway.mockResolvedValue({
+      gateway: { verifyWebhook: vi.fn().mockReturnValue(true) },
+      credentials: { webhookSecret: 'whsec_123' },
+    })
+
+    const res = await webhookPOST(
+      makeReq(provider, payload, { 'x-razorpay-signature': 'sig', 'x-verify': 'sig' }),
+      makeParams(provider) as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('ignored')
+    expect(prisma.payment.update).not.toHaveBeenCalled()
+    expect(prisma.invoice.update).not.toHaveBeenCalled()
+  })
+
+  it('handles phonepe webhook — decodes base64 response', async () => {
+    const phonepeData = JSON.stringify({
+      data: { merchantTransactionId: 'order_789' },
+    })
+    const base64 = Buffer.from(phonepeData).toString('base64')
+
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay2',
+      hospitalId: 'h1',
+      status: 'COMPLETED',
+    } as any)
+
+    const res = await webhookPOST(
+      makeReq('phonepe', { response: base64 }, { 'x-verify': 'verify123' }),
+      makeParams('phonepe') as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('already_processed')
+  })
+
+  it('handles paytm webhook — extracts ORDERID', async () => {
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({
+      id: 'pay3',
+      hospitalId: 'h1',
+      status: 'COMPLETED',
+    } as any)
+
+    const res = await webhookPOST(
+      makeReq('paytm', {
+        body: { ORDERID: 'order_paytm_001', STATUS: 'TXN_SUCCESS' },
+      }),
+      makeParams('paytm') as any
+    )
+    const body = await res.json()
+
+    expect(body.status).toBe('already_processed')
+  })
+
+  it('acknowledges webhook when order_id cannot be extracted', async () => {
+    const res = await webhookPOST(
+      makeReq('razorpay', { payload: {} }),
+      makeParams('razorpay') as any
+    )
+    const body = await res.json()
+
+    // Should acknowledge but not process
+    expect(body.status).toBe('ok')
+  })
+
+  it('handles errors gracefully and returns 200', async () => {
+    vi.mocked(prisma.payment.findFirst).mockRejectedValue(new Error('DB down'))
+
+    const res = await webhookPOST(
+      makeReq('razorpay', {
+        payload: { payment: { entity: { order_id: 'order_err' } } },
+      }),
+      makeParams('razorpay') as any
+    )
+    const body = await res.json()
+
+    // Always return 200 to avoid gateway retries
+    expect(res.status).toBe(200)
+    expect(body.status).toBe('error_logged')
+  })
+})
