@@ -54,7 +54,7 @@ before it are not itemized here; see the git history and the
 - Structured JSON logging (pino) to stdout, replacing ad-hoc `console.*` in
   server code.
 - Dependabot (npm + GitHub Actions) and a CodeQL analysis workflow.
-- Community health files: Code of Conduct, this changelog, and `CODEOWNERS`.
+- Community health files: this changelog and `CODEOWNERS`.
 
 ### Changed
 

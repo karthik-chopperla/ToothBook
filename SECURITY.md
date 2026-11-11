@@ -14,7 +14,7 @@ If you discover a security vulnerability in ToothBook, please report it responsi
 
 ### How to Report
 
-1. Email **[abinavselvam@gmail.com](mailto:abinavselvam@gmail.com)** with:
+1. Email **[karthikchopperla007@gmail.com](mailto:karthikchopperla007@gmail.com)** with:
    - A description of the vulnerability
    - Steps to reproduce
    - Potential impact

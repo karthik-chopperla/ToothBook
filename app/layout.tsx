@@ -37,8 +37,6 @@ export const metadata: Metadata = {
     'dental lab management',
     'multi-branch dental software',
   ],
-  authors: [{ name: 'Abinauv Selvaraj' }],
-  creator: 'Abinauv Selvaraj',
   manifest: '/manifest.json',
   openGraph: {
     type: 'website',
