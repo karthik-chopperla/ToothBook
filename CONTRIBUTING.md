@@ -6,7 +6,7 @@ Thank you for your interest in contributing to ToothBook! This guide will help y
 
 ### Reporting Bugs
 
-1. Check the [existing issues](https://github.com/abinauv/dental-erp/issues) to avoid duplicates
+1. Check the [existing issues](https://github.com/karthik-chopperla/ToothBook/issues) to avoid duplicates
 2. Use the **Bug Report** issue template
 3. Include steps to reproduce, expected behavior, and actual behavior
 4. Include screenshots if applicable
@@ -38,9 +38,9 @@ Thank you for your interest in contributing to ToothBook! This guide will help y
 ## Development Setup
 
 ```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/dental-erp.git
-cd dental-erp
+# Clone the repository
+git clone https://github.com/karthik-chopperla/ToothBook.git
+cd ToothBook
 
 # Install dependencies
 npm install
@@ -150,4 +150,4 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Questions?
 
-Open a [Discussion](https://github.com/abinauv/dental-erp/discussions) for general questions.
+Open a [Discussion](https://github.com/karthik-chopperla/ToothBook/discussions) for general questions.
