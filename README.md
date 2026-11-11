@@ -91,7 +91,3 @@ npm run db:seed             # Load demo data
 
 Use fictional patient data for demos. Do not put real patient records in a
 public or shared test environment.
-
-## License
-
-ToothBook is released under the MIT License. See [LICENSE](LICENSE).

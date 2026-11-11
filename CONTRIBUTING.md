@@ -144,10 +144,6 @@ test(api): add integration tests for patient routes
 - **AI Skills**: Defined in `lib/ai/`, use OpenRouter for model access
 - **UI**: shadcn/ui components in `components/ui/`, Tailwind CSS for styling
 
-## Code of Conduct
-
-Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
-
 ## Questions?
 
 Open a [Discussion](https://github.com/karthik-chopperla/ToothBook/discussions) for general questions.
