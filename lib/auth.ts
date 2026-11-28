@@ -40,6 +40,7 @@ export function verifyPassword(data: { password: string; hash: string }): Promis
 
 const oidcIssuer = process.env.OIDC_ISSUER
 const oidcEnabled = !!oidcIssuer
+const isE2ETestMode = process.env.CI === 'true' && process.env.E2E_TEST_MODE === 'true'
 
 // OIDC/SSO is additive and configuration-gated: with OIDC_ISSUER unset the
 // providers list is empty and the login UI is credentials-only (no change).
@@ -115,7 +116,8 @@ export const auth = betterAuth({
     window: 60,
     max: 100,
     customRules: {
-      '/sign-in/email': { window: 60, max: 5 },
+      // E2E CI logs in once per spec; keep the tighter limit in production.
+      '/sign-in/email': { window: 60, max: isE2ETestMode ? 1000 : 5 },
       '/sign-in/oauth2': { window: 60, max: 10 },
     },
   },

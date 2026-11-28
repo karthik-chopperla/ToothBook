@@ -1,5 +1,4 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from './prisma'
 import { logger } from './logger'
 
 // Better Auth's email/password sign-in verifies the hash stored on the user's
@@ -60,6 +59,7 @@ export async function mirrorCredentialPassword(account: {
   if (account.providerId !== CREDENTIAL_PROVIDER_ID) return
   if (typeof account.userId !== 'string' || typeof account.password !== 'string') return
   try {
+    const { prisma } = await import('./prisma')
     await prisma.user.update({
       where: { id: account.userId },
       data: { password: account.password },

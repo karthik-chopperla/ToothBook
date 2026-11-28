@@ -18,6 +18,7 @@ import {
   AppointmentType,
 } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { syncCredentialAccount } from '../lib/auth-credentials'
 import { getSeedData } from './seed-data'
 
 const prisma = new PrismaClient()
@@ -97,6 +98,8 @@ async function main() {
     },
   })
 
+  if (!admin.password) throw new Error('Seeded admin user has no password hash')
+  await syncCredentialAccount(prisma, admin.id, admin.password)
   console.log('Created admin user:', admin.email)
 
   // Create doctor user
@@ -129,6 +132,8 @@ async function main() {
     },
   })
 
+  if (!doctor.password) throw new Error('Seeded doctor user has no password hash')
+  await syncCredentialAccount(prisma, doctor.id, doctor.password)
   console.log('Created doctor user:', doctor.email)
 
   // Create receptionist user
@@ -159,6 +164,8 @@ async function main() {
     },
   })
 
+  if (!receptionist.password) throw new Error('Seeded receptionist user has no password hash')
+  await syncCredentialAccount(prisma, receptionist.id, receptionist.password)
   console.log('Created receptionist user:', receptionist.email)
 
   // Create sample patients

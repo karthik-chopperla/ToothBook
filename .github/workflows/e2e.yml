@@ -81,6 +81,7 @@ jobs:
           DIRECT_URL: 'postgresql://test:test@localhost:5432/dental_test?schema=public'
           NEXTAUTH_SECRET: 'ci-test-secret-at-least-32-chars-long'
           NEXTAUTH_URL: 'http://localhost:3000'
+          E2E_TEST_MODE: 'true'
 
       # Only chromium — playwright.config.ts narrows the project matrix in CI.
       - name: Install Playwright browsers
@@ -95,6 +96,7 @@ jobs:
           NEXTAUTH_URL: 'http://localhost:3000'
           CRON_SECRET: 'ci-cron-secret'
           ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+          E2E_TEST_MODE: 'true'
 
       - name: Upload Playwright report
         if: always()
